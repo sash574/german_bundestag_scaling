@@ -122,7 +122,7 @@ legend('topright',
 ```
 ```{r, echo=FALSE, results='hide'}
 # extra code cell for saving the plot
-png('images/svd_uncentered.png', width = 700, height = 500, res = 120)
+png('figures/fig1_svd_uncentered.png', width = 700, height = 500, res = 120)
 
 plot(svd_default$u[, 1], svd_default$u[, 2], 
      col = as.factor(party), 
@@ -214,7 +214,7 @@ legend('topright',
 
 ```{r, echo=FALSE, results='hide'}
 # extra code cell for saving the plot
-png('images/svd_centered.png', width = 700, height = 500, res = 120)
+png('figures/fig2_svd_centered.png', width = 700, height = 500, res = 120)
 
 plot(svd_centered$u[, 1], svd_centered$u[, 2], 
      col = as.factor(party), 
@@ -431,7 +431,7 @@ dev.off()
 
 ```{r, results='hide'}
 # extra code cell for saving plot
-png('images/post_dist_ideal_points_per_party.png', width = 700, height = 500, res = 120)
+png('figures/fig3_post_dist_ideal_points_per_party.png', width = 700, height = 500, res = 120)
 
 ggplot(theta_named, aes(x = party, y = mean, fill = party, color = party)) +
   geom_boxplot(alpha = 0.7, outlier.shape = 21, outlier.fill = "white") +
@@ -487,7 +487,7 @@ dev.off()
 
 ```{r, results='hide'}
 # extra cell for saving plot
-png('images/post_dist_ideal_points.png', width = 700, height = 500, res = 120)
+png('figures/fig4_post_dist_ideal_points.png', width = 700, height = 500, res = 120)
 
 ggplot(theta_long, aes(x = value)) +
   geom_density(fill = "steelblue", alpha = 0.5) +
@@ -517,7 +517,7 @@ ggplot(theta_summary, aes(x = reorder(legislator, mean), y = mean)) +
 
 ```{r, echo=FALSE, results='hide'}
 # extra cell for saving plot
-png('images/post_dist_ideal_points_per_legislator.png', width = 700, height = 500, res = 120)
+png('figures/fig5_post_dist_ideal_points_per_legislator.png', width = 700, height = 500, res = 120)
 
 ggplot(theta_summary, aes(x = reorder(legislator, mean), y = mean)) +
   geom_point() +
