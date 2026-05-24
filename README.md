@@ -1,6 +1,6 @@
 # Scaling the 20th German Bundestag: Uncovering Latent Dimensions in Legislators' Votes
 
-In this project, three idealpoint estimation approaches - a baseline SVD, its double-centered counterpart, and a Bayesian one-dimensional 2-PL IRT model — are applied to roll-call data of the 20th German Bundestag, the Ampel period in which SPD, Bündnis 90/Die Grünen, and the FDP formed a three-party reigning coalition from September 2021 until its collapse in March 2025. This analysis revealed latent structure in the underlying geometry, namely, a division along institutional roles in legislator's voting behaviors: those who are coalition-leaning versus those who are opposition-supporting.
+In this project, three idealpoint estimation approaches — a baseline SVD, its double-centered counterpart, and a Bayesian one-dimensional 2-PL IRT model — are applied to roll-call data of the 20th German Bundestag, the Ampel period in which SPD, Bündnis 90/Die Grünen, and the FDP formed a three-party reigning coalition from September 2021 until its collapse in March 2025. This analysis revealed latent structure in the underlying geometry, namely, a division along institutional roles in legislator's voting behaviors: those who are coalition-leaning versus those who are opposition-supporting.
 
 ## Outline
 
@@ -12,7 +12,7 @@ The main analysis is structured as follows:
 - Bayesian One-Dimensional 2-PL IRT Model
 - Substantive Evaluation
 
-The three data files (see folder `data`), a replication file in R Markdown (`scaling_analysis.Rmd`) and further supplementary materials (`figures`) are provided in this repository.
+The three data files (see folder `data`), a replication file in R (`scaling_analysis.R`) as well as R Markdown (`scaling_analysis.Rmd`) and further supplementary materials (`figures`) are provided in this repository.
 
 ## Project Summary and Evaluation
 
