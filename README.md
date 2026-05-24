@@ -41,7 +41,7 @@ Comparing the variance explained by the first and second dimension undermines al
 
 ### III. Singular Value Decomposition (Double-Centered)
 
-Second, I **repeated all these steps for the double-centered matrix**. As rows and columns of the modified matrix have mean zero, this transformation was successful.
+Second, I repeated all these steps for the double-centered matrix. As rows and columns of the modified matrix have mean zero, this transformation was successful.
 
 The results from the SVD with the doubled-centered matrix suggest that the data is still dominated by a main political axis along coalition-support versus opposition-leaning legislators, though the structure is less clean than in the un-centered case. 
 
