@@ -1,0 +1,381 @@
+# title: 'Scaling the 20th German Bundestag'
+# subtitle: 'SVD and Bayesian IRT'
+
+
+set.seed(12345)
+
+# loading relevant libraries
+library(dplyr)
+library(tidyr)
+
+library(filibustr)
+library(ggplot2)
+library(tidyverse)
+library(brms)
+# library(multivariance)
+
+
+# I. Data Preprocessing
+
+# load data
+df_polls <- read.csv('data/bundestag_wp132_polls.csv')
+df_votes <- read.csv('data/bundestag_wp132_votes.csv')
+
+# inspect data
+head(df_polls)
+head(df_votes)
+
+sort(unique(df_votes$fraction_label))
+
+# clean up party affiliation
+df_votes <- df_votes %>%
+  mutate(
+    fraction_label = ifelse(
+      fraction_label %in% c('DIE LINKE. (Bundestag 2021 - 2025)', 'Die Linke. (Gruppe) (Bundestag 2021 - 2025)'),
+      'DIE LINKE. (Bundestag 2021 - 2025)',
+      fraction_label
+    ),
+    fraction_id = ifelse(
+      fraction_label == "DIE LINKE",
+      'DIE LINKE. (Bundestag 2021 - 2025)',
+      fraction_id
+    )
+  )
+
+# keep info on legislators in one clean table
+leg_info <- df_votes %>%
+  select(mandate_id, mandate_label, fraction_label, fraction_id) %>%
+  distinct(mandate_id, .keep_all = TRUE)
+
+# recode vote variable structure (0 = nein, 1 = ja, NA = Enthaltung/nicht angegeben)
+df_wide <- df_votes %>% 
+  mutate(vote_bin = case_when(
+    vote == 'yes' ~ 1,
+    vote == 'no' ~ 0,
+    TRUE ~ NA_real_
+  ))
+
+# convert dataframe into wide matrix (rows = legislator, columns = votes)
+df_matrix <- df_wide %>%
+  select(mandate_id, poll_id, vote_bin) %>%
+  pivot_wider(names_from = poll_id, values_from = vote_bin) %>%
+  tibble::column_to_rownames('mandate_id') %>%
+  as.matrix()
+
+# double-mean imputation
+row_mean <- rowMeans(df_matrix, na.rm = TRUE)
+col_mean <- colMeans(df_matrix, na.rm = TRUE)
+overall_mean <- mean(df_matrix, na.rm = TRUE)
+
+for (i in seq_len(nrow(df_matrix))) {
+  for (j in seq_len(ncol(df_matrix))) {
+    if (is.na(df_matrix[i, j])) {
+      df_matrix[i, j] <- row_mean[i] + col_mean[j] - overall_mean
+    }
+  }
+}
+
+
+# II. Singular Value Decomposition (SVD) (Uncentered)
+
+# perform SVD (u = left singular vectors (legislators), v = right singular vectors (votes), d = singular values)
+svd_default <- svd(df_matrix)
+names(svd_default)
+
+# check where legislators fall on dimensions and whether the dimensions look structured (question a and c)
+
+  # extract mandate_id and combine with party info
+rownames_vec <- rownames(df_matrix)
+leg_info_order <- leg_info[match(rownames_vec, leg_info$mandate_id), ]
+party <- leg_info_order$fraction_label
+
+  # plot (colored by party)
+png('figures/fig1_svd_uncentered.png', width = 700, height = 500, res = 120)
+
+plot(svd_default$u[, 1], svd_default$u[, 2], 
+     col = as.factor(party), 
+     pch = 19,
+     main = 'SVD: Legislators in 2D Space',
+     xlab = 'Dimension 1 (U1): Coalition vs. Opposition', 
+     ylab = 'Dimension 2 (U2): Noise')
+legend('topright', 
+       legend = levels(as.factor(party)), 
+       pch = 19, 
+       col = 1:length(levels(as.factor(party))),
+       cex = 0.4
+       )
+
+# error fixing: ensures correct variable format for matching them later
+df_polls_adj <- df_polls %>%
+  mutate(poll_id = as.character(poll_id))
+
+# link vote loadings to poll information
+vote_labels <- data.frame(
+  poll_id = colnames(df_matrix),
+  v1_value = svd_default$v[, 1],
+  stringsAsFactors = FALSE
+)
+
+votes_extreme <- vote_labels %>%
+  left_join(df_polls_adj, by = "poll_id") %>%
+  arrange(desc(abs(v1_value)))
+
+# top 5 most and least extreme votes in absolute value
+votes_most_extreme <- head(votes_extreme, 5)
+print(votes_most_extreme[, c('poll_id', 'label', 'v1_value')])
+
+votes_least_extreme <- tail(votes_extreme, 5)
+print(votes_least_extreme[, c('poll_id', 'label', 'v1_value')])
+
+# explained variance
+d <- svd_default$d
+vars <- d^2
+var_1 <- vars[1] / sum(vars)
+var_2 <- (vars[1] + vars[2]) / sum(vars)
+
+cat('Variance explained by first dimension (Coalition vs. Opposition):', round(var_1, 3), '\n')
+cat('Variance explained by first two dimensions (Coalition vs. Opposition + Noise):', round(var_2, 3), '\n')
+
+
+# III. SVD with double-centered/normalized data matrix
+
+# double-center the original matrix
+row_mean <- rowMeans(df_matrix, na.rm = TRUE)
+col_mean <- colMeans(df_matrix, na.rm = TRUE)
+overall_mean <- mean(df_matrix, na.rm = TRUE)
+
+matrix_centered <- df_matrix - row_mean[row(df_matrix)] - col_mean[col(df_matrix)] + overall_mean
+
+round(rowMeans(matrix_centered), 10)
+round(colMeans(matrix_centered), 10)
+
+# perform SVD (u = left singular vectors (legislators), v = right singular vectors (votes), d = singular values)
+svd_centered <- svd(matrix_centered)
+names(svd_centered)
+
+# check where legislators fall on dimensions and whether the dimensions look structured (question a and c)
+png('figures/fig2_svd_centered.png', width = 700, height = 500, res = 120)
+
+plot(svd_centered$u[, 1], svd_centered$u[, 2], 
+     col = as.factor(party), 
+     pch = 19,
+     main = 'SVD: Legislators in 2D Space',
+     xlab = 'Dimension 1 (U1): Coalition vs. Opposition', 
+     ylab = 'Dimension 2 (U2): Unclear')
+legend('topright', 
+       legend = levels(as.factor(party)), 
+       pch = 19, 
+       col = 1:length(levels(as.factor(party))),
+       cex = 0.4
+       )
+
+# error fixing: ensures correct variable format for matching them later
+df_polls_adj <- df_polls %>%
+  mutate(poll_id = as.character(poll_id))
+
+# link vote loadings to poll information
+vote_labels <- data.frame(
+  poll_id = colnames(df_matrix),
+  v1_value = svd_centered$v[, 1],
+  stringsAsFactors = FALSE
+)
+
+votes_extreme <- vote_labels %>%
+  left_join(df_polls_adj, by = 'poll_id') %>%
+  arrange(desc(abs(v1_value)))
+
+# top 5 most and least extreme votes in absolute value
+votes_most_extreme <- head(votes_extreme, 5)
+print(votes_most_extreme[, c('poll_id', 'label', 'v1_value')])
+
+votes_least_extreme <- tail(votes_extreme, 5)
+print(votes_least_extreme[, c('poll_id', 'label', 'v1_value')])
+
+# explained variance
+d <- svd_centered$d
+vars <- d^2
+var_1 <- vars[1] / sum(vars)
+var_2 <- (vars[1] + vars[2]) / sum(vars)
+
+cat('Variance explained by first dimension (Coalition vs. Opposition):', round(var_1, 3), '\n')
+cat('Variance explained by first two dimensions (Coalition vs. Opposition + 2nd Dimension):', round(var_2, 3), '\n')
+
+
+# IV. Bayesian Item Response Modeling (IRTM)
+
+# load data
+df_votes_long <- read.csv('data/bundestag_wp132_votes_clean_long.csv')
+
+df_votes_long <- df_votes_long %>%
+  mutate(
+    legislator = factor(name),
+    rollcall   = factor(poll_id),
+    y          = as.integer(y)
+  )
+
+head(df_votes_long)
+
+# fit one-dimensional 2-PL IRT model
+formula_2pl <- bf(
+  y ~ inv_logit(logalpha * eta),
+  eta ~ 1 + (1 | legislator),              # Ideal point per legislator
+  logalpha ~ 1 + (1 | i | rollcall),       # Discrimination per roll‑call
+  nl = TRUE
+)
+
+# specify weakly informative priors (standard normal priors)
+priors_2pl <- c(
+  prior(normal(0, 1), nlpar = 'eta'),
+  prior(normal(0, 1), class = 'sd', group = 'legislator', nlpar = 'eta'),
+  prior(normal(0, 1), nlpar = 'logalpha'),
+  prior(normal(0, 1), class = 'sd', group = 'rollcall', nlpar = 'logalpha')
+)
+
+# fit brms model
+model_2pl <- brm(
+  formula = formula_2pl,
+  data    = df_votes_long,
+  family  = bernoulli(link = 'logit'),
+  prior   = priors_2pl,
+  chains  = 4,
+  cores   = 4,
+  iter    = 40,                       # increase to 4000 if possible
+  warmup  = 20,                       # increase to 2000 if possible
+  control = list(adapt_delta = 0.95)
+)
+
+variables(model_2pl)
+summary(model_2pl)
+
+# extract posterior ideal points from the fitted model
+post <- as_draws_df(model_2pl)
+
+theta_draws <- post %>%
+  select(matches('^r_legislator__eta\\[.*\\,Intercept\\]$'))
+
+theta_long <- theta_draws %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = 'param',
+    values_to = "value"
+  ) %>%
+  mutate(
+    legislator = str_extract(param, '(?<=\\[)[^,]+'),
+    legislator = gsub("\\.", " ", legislator)
+  )
+head(theta_long)
+
+# posterior summaries per legislator
+theta_summary <- theta_long %>%
+  group_by(legislator) %>%
+  summarise(
+    mean = mean(value),
+    median = median(value),
+    lower = quantile(value, 0.025),
+    upper = quantile(value, 0.975),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(mean))
+
+theta_summary
+
+# join in names and party; recoding of items
+leg_info
+
+theta_named <- theta_summary %>%
+  left_join(
+    leg_info %>%
+      transmute(
+        name = stringr::str_remove(mandate_label, " \\(Bundestag 2021 - 2025\\)"),
+        party_raw = fraction_label
+      ) %>%
+      distinct(),
+    by = c('legislator' = 'name')
+  ) %>%
+  mutate(
+    party = factor(case_when(
+      grepl("^SPD", party_raw) ~ "SPD",
+      grepl("^CDU/CSU", party_raw) ~ "CDU/CSU",
+      grepl("^BÜNDNIS 90", party_raw) ~ "Greens",
+      grepl("^FDP", party_raw) ~ "FDP",
+      grepl("^AfD", party_raw) ~ "AfD",
+      grepl("^DIE LINKE|^Die Linke", party_raw) ~ "Left",
+      grepl("^BSW", party_raw) ~ "BSW",
+      grepl("^fraktionslos", party_raw) ~ "Non-attached",
+      TRUE ~ "Other"
+    )),
+    name = legislator
+  ) %>%
+  select(name, party, mean, median, lower, upper)
+
+theta_named
+
+# plot ideal-point distributions by party
+theta_named$party <- factor(theta_named$party, levels = c(
+  "SPD", "Greens", "FDP", "CDU/CSU", "Left", "AfD", "BSW", "Non-attached", "Other"
+))
+
+png('figures/fig3_post_dist_ideal_points_per_party.png', width = 700, height = 500, res = 120)
+
+ggplot(theta_named, aes(x = party, y = mean, fill = party, color = party)) +
+  geom_boxplot(alpha = 0.7, outlier.shape = 21, outlier.fill = "white") +
+  geom_jitter(width = 0.1, alpha = 0.6, size = 1.5) +
+  scale_fill_manual(values = c(
+    "SPD" = "#e41a1c",
+    "CDU/CSU" = "#4d4d4d",
+    "Greens" = "#4daf4a",
+    "FDP" = "#ffcc00",
+    "AfD" = "#377eb8",
+    "Left" = "#984ea3",
+    "BSW" = "#a65628",
+    "Non-attached" = "grey50",
+    "Other" = "grey70"
+  )) +
+  scale_color_manual(values = c(
+    "SPD" = "#e41a1c",
+    "CDU/CSU" = "#4d4d4d",
+    "Greens" = "#4daf4a",
+    "FDP" = "#ffcc00",
+    "AfD" = "#377eb8",
+    "Left" = "#984ea3",
+    "BSW" = "#a65628",
+    "Non-attached" = "grey50",
+    "Other" = "grey70"
+  )) +
+  labs(
+    title = 'Legislators’ Estimated Ideal Points by Party',
+    subtitle = 'Posterior Means from a 1D 2PL IRT model',
+    x = 'Party',
+    y = 'Posterior Mean of Ideal Point'
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "none")
+
+
+# V. Evaluation of Substantive Claim
+
+# plot ooled posterior density of ideal points
+png('figures/fig4_post_dist_ideal_points.png', width = 700, height = 500, res = 120)
+
+ggplot(theta_long, aes(x = value)) +
+  geom_density(fill = "steelblue", alpha = 0.5) +
+  theme_minimal() +
+  labs(
+    x = 'Ideal Point Draw',
+    y = 'Density',
+    title = 'Posterior Distribution of Ideal Points'
+  )
+
+# posterior ideal points per legislator
+png('figures/fig5_post_dist_ideal_points_per_legislator.png', width = 700, height = 500, res = 120)
+
+ggplot(theta_summary, aes(x = reorder(legislator, mean), y = mean)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  coord_flip() +
+  labs(
+    x = 'Legislator',
+    y = 'Posterior Ideal Point',
+    title = 'Posterior Ideal Points with 95% Credible Intervals'
+  ) +
+  theme_minimal()
