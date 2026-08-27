@@ -6,11 +6,11 @@ In this project, three idealpoint estimation approaches — a baseline SVD, its 
 
 The main analysis is structured as follows:
 
-- Data Preprocessing
-- Uncentered SVD
-- SVD with Double-Centered Data Matrix
-- Bayesian One-Dimensional 2-PL IRT Model
-- Substantive Evaluation
+- [Data Preprocessing](#i-data-preprocessing)
+- [Uncentered SVD](#ii-singular-value-decomposition-uncentered)
+- [SVD with Double-Centered Data Matrix](#iii-singular-value-decomposition-double-centered)
+- [Bayesian One-Dimensional 2-PL IRT Model](#iv-bayesian-item-response-modeling-irtm--scaling)
+- [Substantive Evaluation](#v-evaluation-of-substantive-claim-coalition-versus-opposition-dimension-in-the-20th-bundestag)
 
 The three data files (see folder `data`), a replication file in R (`scaling_analysis.R`) as well as R Markdown (`scaling_analysis.Rmd`) and further supplementary materials (`figures`) are provided in this repository.
 
